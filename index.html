@@ -16,9 +16,10 @@
             font-size: 48px; /* Double the size */
             font-weight: bold;
             margin-top: 20px;
+            color: blue; /* Blue title */
         }
 
-        .chart-subtitle {
+        .chart-subtitle, .chart-subtitle-date {
             text-align: center;
             font-size: 16px;
             margin-bottom: 20px;
@@ -54,10 +55,11 @@
 
     <h1 class="chart-title">Estado del embalse del Tajo</h1>
     <h2 class="chart-subtitle">Datos del Ministerio para la Transición Ecológica del Boletín Hidrológico Semanal del Tajo (Abastecimiento a Madrid)</h2>
+    <h2 class="chart-subtitle-date" id="last-updated-date"></h2> <!-- Second subtitle for the update date -->
 
     <div class="chart-container">
         <div class="data-box" id="data-box">
-            <div><strong>Mínimo:</strong> <span id="min-value"></span> hm³</div>
+            <div><strong>Mínimo (> 0):</strong> <span id="min-value"></span> hm³</div>
             <div><strong>Máximo:</strong> <span id="max-value"></span> hm³</div>
             <div><strong>Último valor (> 0):</strong> <span id="latest-value"></span> hm³</div>
             <div><strong>Promedio:</strong> <span id="avg-value"></span> hm³</div>
@@ -79,17 +81,24 @@
                 d.Date = d3.timeParse("%d-%m-%Y")(d.Date);  // Parse the Date
             });
 
+            // Filter values > 0
+            const filteredData = data.filter(d => d.Qty > 0);
+
             // Calculate min, max, latest > 0, and average values
-            const minValue = d3.min(data, d => d.Qty);
-            const maxValue = d3.max(data, d => d.Qty);
-            const latestEntry = data.filter(d => d.Qty > 0).reduce((a, b) => a.Date > b.Date ? a : b);  // Latest value > 0
-            const avgValue = d3.mean(data, d => d.Qty);
+            const minValue = d3.min(filteredData, d => d.Qty);  // Min value > 0
+            const maxValue = d3.max(data, d => d.Qty);          // Max value (can include 0)
+            const latestEntry = filteredData.reduce((a, b) => a.Date > b.Date ? a : b);  // Latest value > 0
+            const avgValue = d3.mean(filteredData, d => d.Qty);
 
             // Display the values
             document.getElementById("min-value").textContent = minValue.toFixed(2);
             document.getElementById("max-value").textContent = maxValue.toFixed(2);
             document.getElementById("latest-value").textContent = latestEntry.Qty.toFixed(2);
             document.getElementById("avg-value").textContent = avgValue.toFixed(2);
+
+            // Display the last updated date
+            const formattedDate = d3.timeFormat("%d-%m-%Y")(latestEntry.Date);
+            document.getElementById("last-updated-date").textContent = "Actualizado el día " + formattedDate;
 
             // Water level simulation
             const svg = d3.select("#water-level-chart");
@@ -129,7 +138,11 @@
                 .enter()
                 .append("text")
                 .attr("x", width / 2)
-                .attr("y", d => yScale(d.value) - 10)
+                .attr("y", function(d, i) {
+                    // Adjust position to prevent overlap
+                    const isOverlap = i > 0 && yScale(dataPoints[i - 1].value) - yScale(d.value) < 20;
+                    return isOverlap ? yScale(d.value) + 20 : yScale(d.value) - 10;
+                })
                 .attr("text-anchor", "middle")
                 .attr("fill", (d, i) => blueColors[i])
                 .text(d => `${d.name}: ${d.value.toFixed(2)} hm³`);
