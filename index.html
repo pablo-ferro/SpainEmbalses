@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estado del embalse del Tajo</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Roboto', sans-serif;
         }
 
         .chart-title {
             text-align: center;
-            font-size: 24px;
+            font-size: 48px; /* Double the size */
             font-weight: bold;
             margin-top: 20px;
         }
@@ -30,18 +31,23 @@
             margin-top: 30px;
         }
 
-        .data-box {
+        .data-box, .water-level-box {
             width: 300px;
             border: 1px solid #ccc;
             padding: 20px;
             text-align: center;
             font-size: 18px;
+            margin-bottom: 40px;
         }
 
-        .data-box div {
+        .data-box div, .water-level-box div {
             margin: 10px 0;
         }
 
+        svg {
+            display: block;
+            margin: 0 auto;
+        }
     </style>
 </head>
 <body>
@@ -53,8 +59,14 @@
         <div class="data-box" id="data-box">
             <div><strong>Mínimo:</strong> <span id="min-value"></span> hm³</div>
             <div><strong>Máximo:</strong> <span id="max-value"></span> hm³</div>
-            <div><strong>Último valor:</strong> <span id="latest-value"></span> hm³</div>
+            <div><strong>Último valor (> 0):</strong> <span id="latest-value"></span> hm³</div>
             <div><strong>Promedio:</strong> <span id="avg-value"></span> hm³</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <div class="water-level-box">
+            <svg id="water-level-chart" width="300" height="400"></svg>
         </div>
     </div>
 
@@ -67,10 +79,10 @@
                 d.Date = d3.timeParse("%d-%m-%Y")(d.Date);  // Parse the Date
             });
 
-            // Calculate min, max, latest, and average values
+            // Calculate min, max, latest > 0, and average values
             const minValue = d3.min(data, d => d.Qty);
             const maxValue = d3.max(data, d => d.Qty);
-            const latestEntry = data.reduce((a, b) => a.Date > b.Date ? a : b);
+            const latestEntry = data.filter(d => d.Qty > 0).reduce((a, b) => a.Date > b.Date ? a : b);  // Latest value > 0
             const avgValue = d3.mean(data, d => d.Qty);
 
             // Display the values
@@ -78,6 +90,50 @@
             document.getElementById("max-value").textContent = maxValue.toFixed(2);
             document.getElementById("latest-value").textContent = latestEntry.Qty.toFixed(2);
             document.getElementById("avg-value").textContent = avgValue.toFixed(2);
+
+            // Water level simulation
+            const svg = d3.select("#water-level-chart");
+            const width = +svg.attr("width");
+            const height = +svg.attr("height");
+
+            const yScale = d3.scaleLinear()
+                .domain([0, maxValue * 1.2])  // 0 to 120% of max value
+                .range([height - 20, 20]);
+
+            // Define blue shades for the lines
+            const blueColors = ["#004c99", "#0066cc", "#3399ff", "#66b3ff"];
+
+            // Data points for lines
+            const dataPoints = [
+                { name: "Min", value: minValue },
+                { name: "Max", value: maxValue },
+                { name: "Latest", value: latestEntry.Qty },
+                { name: "Avg", value: avgValue }
+            ];
+
+            // Draw water level lines
+            svg.selectAll("line")
+                .data(dataPoints)
+                .enter()
+                .append("line")
+                .attr("x1", 0)
+                .attr("x2", width)
+                .attr("y1", d => yScale(d.value))
+                .attr("y2", d => yScale(d.value))
+                .attr("stroke", (d, i) => blueColors[i])
+                .attr("stroke-width", 4);
+
+            // Add labels for each line
+            svg.selectAll("text")
+                .data(dataPoints)
+                .enter()
+                .append("text")
+                .attr("x", width / 2)
+                .attr("y", d => yScale(d.value) - 10)
+                .attr("text-anchor", "middle")
+                .attr("fill", (d, i) => blueColors[i])
+                .text(d => `${d.name}: ${d.value.toFixed(2)} hm³`);
+
         }).catch(function(error) {
             console.error("Error loading the CSV data: ", error);
         });
