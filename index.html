@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estado del embalse del Tajo</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .chart-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .chart-subtitle {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .data-box {
+            width: 300px;
+            border: 1px solid #ccc;
+            padding: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        .data-box div {
+            margin: 10px 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1 class="chart-title">Estado del embalse del Tajo</h1>
+    <h2 class="chart-subtitle">Datos del Ministerio para la Transición Ecológica del Boletín Hidrológico Semanal del Tajo (Abastecimiento a Madrid)</h2>
+
+    <div class="chart-container">
+        <div class="data-box" id="data-box">
+            <div><strong>Mínimo:</strong> <span id="min-value"></span> hm³</div>
+            <div><strong>Máximo:</strong> <span id="max-value"></span> hm³</div>
+            <div><strong>Último valor:</strong> <span id="latest-value"></span> hm³</div>
+            <div><strong>Promedio:</strong> <span id="avg-value"></span> hm³</div>
+        </div>
+    </div>
+
+    <script>
+        // Load CSV data
+        d3.csv("https://raw.githubusercontent.com/pablo-ferro/SpainEmbalses/refs/heads/main/dfEmbalseMadrid.csv").then(function(data) {
+            // Parse the CSV
+            data.forEach(function(d) {
+                d.Qty = +d.Qty;  // Convert the Qty to number
+                d.Date = d3.timeParse("%d-%m-%Y")(d.Date);  // Parse the Date
+            });
+
+            // Calculate min, max, latest, and average values
+            const minValue = d3.min(data, d => d.Qty);
+            const maxValue = d3.max(data, d => d.Qty);
+            const latestEntry = data.reduce((a, b) => a.Date > b.Date ? a : b);
+            const avgValue = d3.mean(data, d => d.Qty);
+
+            // Display the values
+            document.getElementById("min-value").textContent = minValue.toFixed(2);
+            document.getElementById("max-value").textContent = maxValue.toFixed(2);
+            document.getElementById("latest-value").textContent = latestEntry.Qty.toFixed(2);
+            document.getElementById("avg-value").textContent = avgValue.toFixed(2);
+        }).catch(function(error) {
+            console.error("Error loading the CSV data: ", error);
+        });
+    </script>
+
+</body>
+</html>
