@@ -19,7 +19,7 @@
             font-size: 48px; /* Double the size */
             font-weight: bold;
             margin-top: 20px;
-            color: blue; /* Blue title */
+            color: #66b3ff; /* New title color */
             font-family: 'Climate Crisis', cursive;
         }
 
@@ -46,26 +46,17 @@
 
         .data-box, .water-level-box, .line-chart-box {
             width: 300px;
-            border: 1px solid #ccc;
             padding: 20px;
             text-align: center;
             font-size: 18px;
-            margin: 0; /* Removed gaps between boxes */
+            margin: 0;
             height: 100%;
-        }
-
-        .water-level-box svg {
-            display: block;
-            margin: 0 auto;
-        }
-
-        .data-box div, .water-level-box div, .line-chart-box div {
-            margin: 10px 0;
+            box-sizing: border-box; /* Ensure padding doesn't affect box size */
         }
 
         svg {
-            display: block;
-            margin: 0 auto;
+            width: 100%; /* Extend SVG to cover the whole box */
+            height: 100%;
         }
 
         .water-level-box:hover text, .water-level-box:hover rect {
@@ -74,6 +65,16 @@
 
         line:hover {
             stroke-width: 6px; /* Thicker lines on hover */
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 5px;
+            background: lightsteelblue;
+            border: 1px solid #ccc;
+            pointer-events: none;
+            opacity: 0;
         }
     </style>
 </head>
@@ -91,17 +92,20 @@
         </div>
 
         <div class="water-level-box">
-            <svg id="water-level-chart" width="300" height="400"></svg>
+            <svg id="water-level-chart"></svg>
         </div>
 
         <div class="line-chart-box">
-            <svg id="line-chart" width="300" height="400"></svg>
+            <svg id="line-chart"></svg>
         </div>
     </div>
 
     <h2 class="bottom-subtitle">Datos del Ministerio para la Transición Ecológica del Boletín Hidrológico Semanal del Tajo (Abastecimiento a Madrid)</h2>
 
     <script>
+        // Create a tooltip
+        const tooltip = d3.select("body").append("div").attr("class", "tooltip");
+
         // Load CSV data
         d3.csv("https://raw.githubusercontent.com/pablo-ferro/SpainEmbalses/refs/heads/main/dfEmbalseMadrid.csv").then(function(data) {
             // Parse the CSV
@@ -112,6 +116,9 @@
 
             // Filter values > 0
             const filteredData = data.filter(d => d.Qty > 0);
+
+            // Sort data by date ascending
+            filteredData.sort((a, b) => d3.ascending(a.Date, b.Date));
 
             // Calculate min, max, latest > 0, and average values
             const minValue = d3.min(filteredData, d => d.Qty);  // Min value > 0
@@ -210,8 +217,49 @@
                 .attr("stroke-width", 2)
                 .attr("d", line);
 
-        }).catch(function(error) {
-            console.error("Error loading the CSV data: ", error);
+            // Add hover interactivity to display date
+            // Add hover interactivity to display date and qty value in mm
+            svgLine.selectAll("circle")
+                .data(filteredData)
+                .enter()
+                .append("circle")
+                .attr("cx", d => xScaleLine(d.Date))
+                .attr("cy", d => yScaleLine(d.Qty))
+                .attr("r", 4)
+                .attr("fill", "steelblue")
+                .on("mouseover", function(event, d) {
+                    d3.select(this).attr("r", 6).attr("fill", "orange");
+
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+
+                    tooltip.html(`Fecha: ${d3.timeFormat("%d-%m-%Y")(d.Date)}<br>Cantidad: ${d.Qty.toFixed(2)} mm`)
+                        .style("left", (event.pageX + 5) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    d3.select(this).attr("r", 4).attr("fill", "steelblue");
+
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // X axis
+            const xAxis = d3.axisBottom(xScaleLine)
+                .tickFormat(d3.timeFormat("%b"));
+
+            svgLine.append("g")
+                .attr("transform", `translate(0, ${height - 20})`)
+                .call(xAxis);
+
+            // Y axis
+            const yAxis = d3.axisLeft(yScaleLine);
+
+            svgLine.append("g")
+                .attr("transform", "translate(20, 0)")
+                .call(yAxis);
         });
     </script>
 
