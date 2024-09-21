@@ -6,9 +6,12 @@
     <title>Estado del embalse del Tajo</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Climate+Crisis&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
         }
 
         .chart-title {
@@ -17,45 +20,66 @@
             font-weight: bold;
             margin-top: 20px;
             color: blue; /* Blue title */
+            font-family: 'Climate Crisis', cursive;
         }
 
-        .chart-subtitle, .chart-subtitle-date {
+        .chart-subtitle-date {
             text-align: center;
             font-size: 16px;
             margin-bottom: 20px;
             color: #666;
         }
 
-        .chart-container {
-            display: flex;
-            justify-content: space-between;
-            margin: 30px;
-            height: 80vh; /* Extend height to 80% of the screen */
+        .bottom-subtitle {
+            text-align: center;
+            font-size: 16px;
+            margin-top: 50px;
+            color: #666;
         }
 
-        .data-box, .water-level-box {
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            height: 60vh; /* Reduced height by 20% */
+        }
+
+        .data-box, .water-level-box, .line-chart-box {
             width: 300px;
             border: 1px solid #ccc;
             padding: 20px;
             text-align: center;
             font-size: 18px;
+            margin: 0; /* Removed gaps between boxes */
+            height: 100%;
+        }
+
+        .water-level-box svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        .data-box div, .water-level-box div, .line-chart-box div {
+            margin: 10px 0;
         }
 
         svg {
             display: block;
             margin: 0 auto;
-            height: 100%;
         }
 
-        .line:hover {
-            stroke-width: 6px;
+        .water-level-box:hover text, .water-level-box:hover rect {
+            fill-opacity: 0.7; /* Hover effect on the center text */
+        }
+
+        line:hover {
+            stroke-width: 6px; /* Thicker lines on hover */
         }
     </style>
 </head>
 <body>
 
     <h1 class="chart-title">Estado del embalse del Tajo</h1>
-    <h2 class="chart-subtitle">Datos del Ministerio para la Transición Ecológica del Boletín Hidrológico Semanal del Tajo (Abastecimiento a Madrid)</h2>
     <h2 class="chart-subtitle-date" id="last-updated-date"></h2> <!-- Second subtitle for the update date -->
 
     <div class="chart-container">
@@ -71,9 +95,11 @@
         </div>
 
         <div class="line-chart-box">
-            <svg id="line-chart" width="400" height="400"></svg>
+            <svg id="line-chart" width="300" height="400"></svg>
         </div>
     </div>
+
+    <h2 class="bottom-subtitle">Datos del Ministerio para la Transición Ecológica del Boletín Hidrológico Semanal del Tajo (Abastecimiento a Madrid)</h2>
 
     <script>
         // Load CSV data
@@ -123,35 +149,19 @@
                 { name: "Avg", value: avgValue }
             ];
 
-            // Draw water level area
-            svg.selectAll("rect")
-                .data([dataPoints[2]]) // Simulate water level using the latest value
-                .enter()
-                .append("rect")
-                .attr("x", 0)
-                .attr("y", d => yScale(d.value))
-                .attr("width", width)
-                .attr("height", d => height - yScale(d.value))
-                .attr("fill", "#66b3ff");
-
             // Draw water level lines
             svg.selectAll("line")
                 .data(dataPoints)
                 .enter()
                 .append("line")
-                .attr("class", "line")
                 .attr("x1", 0)
                 .attr("x2", width)
                 .attr("y1", d => yScale(d.value))
                 .attr("y2", d => yScale(d.value))
                 .attr("stroke", (d, i) => blueColors[i])
                 .attr("stroke-width", 4)
-                .on("mouseover", function(event, d) {
-                    d3.select(this).attr("stroke-width", 6); // Highlight on hover
-                })
-                .on("mouseout", function(event, d) {
-                    d3.select(this).attr("stroke-width", 4); // Remove highlight
-                });
+                .on("mouseover", function() { d3.select(this).attr("stroke-width", 6); })
+                .on("mouseout", function() { d3.select(this).attr("stroke-width", 4); });
 
             // Add labels for each line
             svg.selectAll("text")
@@ -160,6 +170,7 @@
                 .append("text")
                 .attr("x", width / 2)
                 .attr("y", function(d, i) {
+                    // Adjust position to prevent overlap
                     const isOverlap = i > 0 && yScale(dataPoints[i - 1].value) - yScale(d.value) < 20;
                     return isOverlap ? yScale(d.value) + 20 : yScale(d.value) - 10;
                 })
@@ -167,43 +178,41 @@
                 .attr("fill", (d, i) => blueColors[i])
                 .text(d => `${d.name}: ${d.value.toFixed(2)} hm³`);
 
+            // Draw the water level area
+            svg.append("rect")
+                .attr("x", 0)
+                .attr("y", yScale(latestEntry.Qty))
+                .attr("width", width)
+                .attr("height", height - yScale(latestEntry.Qty))
+                .attr("fill", "#3399ff")
+                .attr("fill-opacity", 0.4);
+
             // Line chart on the right
-            const lineSvg = d3.select("#line-chart");
-            const lineWidth = +lineSvg.attr("width");
-            const lineHeight = +lineSvg.attr("height");
+            const svgLine = d3.select("#line-chart");
 
-            const xScale = d3.scaleTime()
-                .domain(d3.extent(data, d => d.Date))
-                .range([50, lineWidth - 50]);
+            const xScaleLine = d3.scaleTime()
+                .domain(d3.extent(filteredData, d => d.Date))
+                .range([20, width - 20]);
 
-            const lineYScale = d3.scaleLinear()
-                .domain([0, d3.max(data, d => d.Qty)])
-                .range([lineHeight - 50, 50]);
+            const yScaleLine = d3.scaleLinear()
+                .domain([0, maxValue])
+                .range([height - 20, 20]);
 
             const line = d3.line()
-                .x(d => xScale(d.Date))
-                .y(d => lineYScale(d.Qty));
+                .x(d => xScaleLine(d.Date))
+                .y(d => yScaleLine(d.Qty));
 
-            lineSvg.append("path")
-                .datum(data)
+            // Add the line to the chart
+            svgLine.append("path")
+                .datum(filteredData)
                 .attr("fill", "none")
-                .attr("stroke", "#004c99")
+                .attr("stroke", "steelblue")
                 .attr("stroke-width", 2)
                 .attr("d", line);
 
-            // Add x-axis
-            lineSvg.append("g")
-                .attr("transform", `translate(0, ${lineHeight - 50})`)
-                .call(d3.axisBottom(xScale).ticks(6).tickFormat(d3.timeFormat("%b")));
-
-            // Add y-axis
-            lineSvg.append("g")
-                .attr("transform", `translate(50, 0)`)
-                .call(d3.axisLeft(lineYScale));
         }).catch(function(error) {
-        console.error("Error loading the CSV data: ", error);
+            console.error("Error loading the CSV data: ", error);
         });
-
     </script>
 
 </body>
